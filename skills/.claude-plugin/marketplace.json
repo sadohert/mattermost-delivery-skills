@@ -1,0 +1,22 @@
+{
+  "name": "mattermost-delivery-skills",
+  "owner": {
+    "name": "Mattermost",
+    "email": "delivery@mattermost.com"
+  },
+  "metadata": {
+    "description": "Shared Claude Code skills for Mattermost staff and partners managing customer delivery projects",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "rocketlane",
+      "description": "Manage Rocketlane projects and tasks via REST API. Create, update, list, and delete tasks with phase and visibility (public/private) control. Use when the user wants to create delivery tasks, update task status, list project tasks, or manage Rocketlane project boards — including any mention of Rocketlane, delivery tasks, project tracking, customer project management, or task boards.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./rocketlane/rocketlane"
+      ]
+    }
+  ]
+}
