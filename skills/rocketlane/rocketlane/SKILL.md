@@ -1,6 +1,6 @@
 ---
 name: rocketlane
-description: "Manage Rocketlane projects and tasks via REST API. Create, update, list, and delete tasks with phase and visibility (public/private) control. Use this skill whenever the user mentions Rocketlane, delivery tasks, project tracking, customer project management, task boards, creating follow-up tickets, or managing delivery project tasks. Also use when the user asks to create tasks from a status report or meeting notes."
+description: "Manage Rocketlane projects, tasks, and project updates via REST API. Create, update, list, and delete tasks with phase and visibility (public/private) control. Post project status updates (customer-facing and internal). Use this skill whenever the user mentions Rocketlane, delivery tasks, project tracking, customer project management, task boards, creating follow-up tickets, posting project updates, status reports, or managing delivery project tasks. Also use when the user asks to create tasks from a status report or meeting notes."
 ---
 
 # Rocketlane Project & Task Manager
@@ -15,9 +15,12 @@ Rocketlane is a customer onboarding and project delivery platform. This skill le
 - Update task status (To do, In progress, Completed, Blocked)
 - Delete tasks
 - Read task details
+- Post project updates (customer-facing or internal-only)
 
-**Public tasks** are visible to both Mattermost staff and the customer.
-**Private tasks** are only visible to Mattermost staff (internal follow-ups, lessons learned, etc.).
+**Public** items are visible to both Mattermost staff and the customer.
+**Private** items are only visible to Mattermost staff (internal follow-ups, lessons learned, etc.).
+
+**IMPORTANT: You cannot mix public and private content in a single project update.** A project update is either entirely public (customer-visible) or entirely private (staff-only). If you need both, create two separate updates — one public, one private.
 
 ## Configuration
 
@@ -190,7 +193,92 @@ for pid, pname in sorted(phases.items()):
 "
 ```
 
-Common phase names: Intake, Prerequisites, Delivery, Wrapup.
+Phase names vary by project — always discover them dynamically rather than assuming names.
+
+## Project Updates (Status Updates)
+
+Project updates are posted to the "Project updates" tab in Rocketlane. They can be public (customer-visible, shown in white) or private (staff-only, shown in yellow).
+
+**A project update cannot mix public and private content.** Create separate updates for each audience.
+
+### Creating a Project Update
+
+The flow is: create draft → get document ID → get section ID → write content → publish.
+
+**Step 1: Create the status update draft**
+
+```bash
+curl -s -X POST \
+  -H "api-key: $ROCKETLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  "$BASE_URL/status-updates" \
+  -d '{
+    "statusUpdateTitle": "Update Title",
+    "collaborators": [],
+    "state": "DRAFT",
+    "toUsers": [],
+    "project": {"projectId": PROJECT_ID},
+    "private": false
+  }'
+```
+
+Set `"private": true` for internal-only updates. Response includes `statusUpdateId` and `document.documentId`.
+
+**Step 2: Get the default section ID**
+
+The document is created with one empty section. Retrieve its ID:
+
+```bash
+curl -s -H "api-key: $ROCKETLANE_API_KEY" \
+  "$BASE_URL/projects/{projectId}/documents/{documentId}/" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+sections = d.get('document', d).get('sections', [])
+for s in sections:
+    print(f'Section ID: {s[\"documentSectionId\"]}, type: {s.get(\"meta\",{}).get(\"sectionType\",\"?\")}')
+"
+```
+
+**Step 3: Write content to the section**
+
+Use the section ID from step 2 — you must reference it to update (creating a new section without referencing the existing one will fail with "Section already exists"):
+
+```bash
+curl -s -X PUT \
+  -H "api-key: $ROCKETLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  "$BASE_URL/projects/{projectId}/documents/{documentId}/" \
+  -d '{
+    "document": {
+      "sections": [
+        {
+          "documentSectionId": "SECTION_ID",
+          "content": "<h2>Title</h2><p>HTML content here.</p>"
+        }
+      ]
+    }
+  }'
+```
+
+Content is HTML. Use `<h2>`, `<p>`, `<ul>`, `<li>`, `<strong>`, `<code>` for formatting.
+
+**Step 4: Publish**
+
+```bash
+curl -s -X POST \
+  -H "api-key: $ROCKETLANE_API_KEY" \
+  "$BASE_URL/status-updates/{statusUpdateId}/publish"
+```
+
+### Project Update Workflow Example
+
+When posting a day summary with both customer and internal content:
+
+1. Create a **public** status update with the customer-facing summary
+2. Create a **separate private** status update with internal notes
+3. Publish both
+
+This results in two entries in the Project Updates tab — one white (public), one yellow (private).
 
 ## Common Workflows
 
