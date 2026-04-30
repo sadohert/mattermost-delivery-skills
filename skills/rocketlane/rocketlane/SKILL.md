@@ -1,6 +1,6 @@
 ---
 name: rocketlane
-description: "Manage Rocketlane projects, tasks, and project updates via REST API. Create, update, list, and delete tasks with phase and visibility (public/private) control. Post project status updates (customer-facing and internal). Use this skill whenever the user mentions Rocketlane, delivery tasks, project tracking, customer project management, task boards, creating follow-up tickets, posting project updates, status reports, or managing delivery project tasks. Also use when the user asks to create tasks from a status report or meeting notes."
+description: "Manage Rocketlane projects, tasks, and project updates via REST API. Create, update, list, and delete tasks with phase and visibility (public/private) control. Comment on tasks. Post project status updates (customer-facing and internal). Use this skill whenever the user mentions Rocketlane, delivery tasks, project tracking, customer project management, task boards, creating follow-up tickets, posting project updates, status reports, commenting on tasks, or managing delivery project tasks. Also use when the user asks to create tasks from a status report or meeting notes."
 ---
 
 # Rocketlane Project & Task Manager
@@ -15,10 +15,11 @@ Rocketlane is a customer onboarding and project delivery platform. This skill le
 - Update task status (To do, In progress, Completed, Blocked)
 - Delete tasks
 - Read task details
+- Comment on tasks
 - Post project updates (customer-facing or internal-only)
 
-**Public** items are visible to both Mattermost staff and the customer.
-**Private** items are only visible to Mattermost staff (internal follow-ups, lessons learned, etc.).
+**Public** items are visible to both your team and the customer.
+**Private** items are only visible to your internal team (internal follow-ups, lessons learned, etc.).
 
 **IMPORTANT: You cannot mix public and private content in a single project update.** A project update is either entirely public (customer-visible) or entirely private (staff-only). If you need both, create two separate updates — one public, one private.
 
@@ -35,13 +36,12 @@ To obtain an API key: log into Rocketlane, navigate to your profile or settings,
 
 ### Base URL
 
-The default base URL for Mattermost's Rocketlane instance is:
+Check for the base URL in this order:
 
-```
-https://services.api.mattermost.com/api/v1
-```
+1. **Environment variable**: `ROCKETLANE_BASE_URL`
+2. **Ask the user** if not set
 
-If the user is on a different Rocketlane instance, they can specify the base URL. The general pattern is `https://<instance>.api.<domain>/api/v1`.
+The general pattern for Rocketlane instances is `https://<subdomain>.api.<domain>/api/v1`. The user can find their exact URL by opening DevTools in their browser while logged into Rocketlane and inspecting the API requests.
 
 ### Default Project
 
@@ -52,7 +52,7 @@ If the user frequently works with one project, they can specify a default projec
 All requests use:
 - **Header**: `api-key: <ROCKETLANE_API_KEY>`
 - **Content-Type**: `application/json`
-- **Base URL**: `https://services.api.mattermost.com/api/v1`
+- **Base URL**: `$ROCKETLANE_BASE_URL`
 
 ### List Projects
 
@@ -170,6 +170,27 @@ curl -s -X DELETE \
 ```
 
 Returns empty body on success.
+
+### Comment on a Task
+
+Each task has a `commentThreadId` field (returned when listing or fetching tasks). Use it to post comments:
+
+```bash
+curl -s -X POST \
+  -H "api-key: $ROCKETLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  "$BASE_URL/comments" \
+  -d '{
+    "commentThreadId": COMMENT_THREAD_ID,
+    "content": "<p>HTML comment content here.</p>"
+  }'
+```
+
+**Important:** The field name is `content`, not `comment`. The `commentThreadId` comes from the task object — fetch the task first if you don't have it.
+
+Response includes `commentId`, `commentContext` (links back to the task), and `private` (inherits from the task's visibility).
+
+Content is HTML — use `<p>`, `<a href="...">`, `<code>`, etc. for formatting. Useful for linking to PRs, issues, or external resources from a task's conversation thread.
 
 ## Discovering Phases
 
